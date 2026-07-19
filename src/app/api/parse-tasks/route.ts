@@ -6,23 +6,24 @@ const anthropic = new Anthropic({
 });
 
 function buildSystemPrompt(today: string): string {
-  return `You are a task extraction assistant. The user will give you a freeform text dump (possibly in Ukrainian, English, or mixed languages). Your job is to extract individual tasks from this text.
+  const tomorrow = new Date(new Date(today).getTime() + 86400000).toISOString().split("T")[0];
+  return `You are a task extraction assistant. The user will give you a freeform text dump in ANY language (Ukrainian, English, Russian, Polish, German, Spanish, mixed, transliterated, or slang). Your job is to extract individual tasks from this text.
 
 For each task, return:
-- title: a clean, actionable task title (in the same language the user used)
+- title: a clean, actionable task title (KEEP the same language the user used — do NOT translate)
 - priority: "low", "medium", or "high" based on urgency cues
-- due_date: ISO date string (YYYY-MM-DD) or null. Today is ${today}. Interpret relative dates: "завтра"/"tomorrow" = tomorrow, "сьогодні"/"today" = today, etc.
-- scheduled_time: HH:MM format (24h) or null, if the user mentioned a specific time
-- tags: array of 1-3 short category tags (e.g. ["work"], ["shopping"], ["health", "personal"]). Always assign at least one tag based on the task content.
+- due_date: ISO date string (YYYY-MM-DD) or null. Today is ${today}, tomorrow is ${tomorrow}. Interpret relative dates in any language: "завтра"/"tomorrow"/"morgen"/"mañana" = ${tomorrow}, "сьогодні"/"today"/"heute"/"hoy" = ${today}, "післязавтра"/"day after tomorrow" = day after ${tomorrow}, "в понеділок"/"on Monday" = next Monday from ${today}, etc.
+- scheduled_time: HH:MM format (24h) or null. Parse time in any format: "at 3pm" = "15:00", "о 10 ранку" = "10:00", "at 14:30" = "14:30", "в обід" = "12:00", "ввечері" = "19:00", "вранці" = "09:00"
+- tags: array of 1-3 short category tags in English (e.g. ["work"], ["shopping"], ["health", "personal"]). Always assign at least one tag based on the task content.
 - estimated_minutes: estimated time in minutes to complete the task (e.g. 15, 30, 60). Use your best judgment.
 
 Rules:
-- ALWAYS return at least one task, even if the input is unclear or seems like gibberish — use the raw text as the task title
-- One text dump may contain multiple tasks — split them into separate items
+- ALWAYS return at least one task, even if the input is unclear, gibberish, emoji-only, or a single word — use the raw text as the task title
+- One text dump may contain multiple tasks — split them by commas, newlines, "and"/"і"/"и", or context shifts
 - If no urgency cue is given, default to "medium"
-- If the user explicitly says something is not urgent ("не терміново", "not urgent", "low priority"), set priority to "low"
-- If the user says urgent/important/ASAP/терміново, set priority to "high"
-- Respond with ONLY valid JSON — no markdown fences, no explanation, just a JSON array`;
+- Priority cues in any language: "не терміново"/"not urgent"/"low priority"/"можна потім" → "low"; "терміново"/"urgent"/"ASAP"/"важливо"/"срочно"/"important" → "high"
+- Handle typos and informal speech gracefully — "kupyty moloko" should become a shopping task
+- Respond with ONLY valid JSON — no markdown fences, no explanation, just a raw JSON array`;
 }
 
 const ALLOWED_MODELS = [
