@@ -4,7 +4,8 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Mic, MicOff, Send, Loader2, WifiOff } from "lucide-react";
 import { toast } from "sonner";
-import { createClient } from "@/lib/supabase/client";
+import { addTasks } from "@/lib/task-store";
+import type { ParsedTask, TaskSource } from "@/lib/types";
 
 interface SpeechRecognitionEvent {
   resultIndex: number;
@@ -21,9 +22,8 @@ export function CaptureInput() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
   const [speechSupported, setSpeechSupported] = useState(false);
-  const [source, setSource] = useState<"text" | "voice">("text");
+  const [source, setSource] = useState<TaskSource>("text");
   const recognitionRef = useRef<ReturnType<typeof createSpeechRecognition> | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     setSpeechSupported(
@@ -105,17 +105,9 @@ export function CaptureInput() {
     setIsSubmitting(true);
 
     try {
-      const supabase = createClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
       const res = await fetch("/api/parse-tasks", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session?.access_token}`,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ raw_input: rawInput, source }),
       });
 
@@ -125,9 +117,12 @@ export function CaptureInput() {
       }
 
       const data = await res.json();
+      const parsed: ParsedTask[] = data.tasks;
+
+      addTasks(parsed, rawInput, source);
       setText("");
       setSource("text");
-      toast.success(`${data.tasks.length} task(s) added to Inbox`);
+      toast.success(`${parsed.length} task(s) added to Inbox`);
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Something went wrong. Try again."
@@ -155,7 +150,6 @@ export function CaptureInput() {
 
       <div className="relative">
         <textarea
-          ref={textareaRef}
           value={text}
           onChange={(e) => {
             setText(e.target.value);

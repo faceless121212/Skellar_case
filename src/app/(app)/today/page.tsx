@@ -4,45 +4,27 @@ import { useState } from "react";
 import { useTasks } from "@/lib/use-tasks";
 import { TaskCard } from "@/components/task-card";
 import { Button } from "@/components/ui/button";
-import { createClient } from "@/lib/supabase/client";
+import { planMyDay } from "@/lib/task-store";
 import { Loader2, Sun, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 export default function TodayPage() {
   const { tasks, loading, updateTask, fetchTasks } = useTasks("today");
   const [planning, setPlanning] = useState(false);
-  const supabase = createClient();
 
   const activeTasks = tasks.filter((t) => t.status !== "done");
   const doneTasks = tasks.filter((t) => t.status === "done");
 
-  async function handlePlanMyDay() {
+  function handlePlanMyDay() {
     setPlanning(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const res = await fetch("/api/tasks/plan", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (!res.ok) throw new Error("Failed to plan");
-
-      const data = await res.json();
-      if (data.moved > 0) {
-        toast.success(`${data.moved} task(s) moved to Today`);
-        fetchTasks();
-      } else {
-        toast.info("No tasks to plan. Add some in Capture first!");
-      }
-    } catch {
-      toast.error("Failed to plan your day");
-    } finally {
-      setPlanning(false);
+    const moved = planMyDay();
+    if (moved > 0) {
+      toast.success(`${moved} task(s) moved to Today`);
+      fetchTasks();
+    } else {
+      toast.info("No tasks to plan. Add some in Capture first!");
     }
+    setPlanning(false);
   }
 
   return (

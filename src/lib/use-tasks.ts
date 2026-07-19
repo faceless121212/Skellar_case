@@ -1,81 +1,40 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { createClient } from "@/lib/supabase/client";
 import type { Task, TaskStatus } from "@/lib/types";
+import * as store from "@/lib/task-store";
 
 export function useTasks(status?: TaskStatus) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
-  const supabase = createClient();
 
-  const fetchTasks = useCallback(async () => {
-    setLoading(true);
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
-
-    const url = status
-      ? `/api/tasks?status=${status}`
-      : `/api/tasks`;
-
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${session.access_token}` },
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      setTasks(data.tasks ?? []);
-    }
+  const fetchTasks = useCallback(() => {
+    setTasks(store.getTasks(status));
     setLoading(false);
-  }, [status, supabase.auth]);
+  }, [status]);
 
   useEffect(() => {
     fetchTasks();
   }, [fetchTasks]);
 
   async function updateTask(id: string, updates: Partial<Task>) {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
-
-    const res = await fetch("/api/tasks", {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({ id, ...updates }),
-    });
-
-    if (res.ok) {
-      const data = await res.json();
+    const updated = store.updateTask(id, updates);
+    if (updated) {
       setTasks((prev) =>
         prev
-          .map((t) => (t.id === id ? data.task : t))
+          .map((t) => (t.id === id ? updated : t))
           .filter((t) => !status || t.status === status)
       );
     }
-
-    return res.ok;
+    return !!updated;
   }
 
   async function deleteTask(id: string) {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
-
-    const res = await fetch("/api/tasks", {
-      method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({ id }),
-    });
-
-    if (res.ok) {
+    const ok = store.deleteTask(id);
+    if (ok) {
       setTasks((prev) => prev.filter((t) => t.id !== id));
     }
-
-    return res.ok;
+    return ok;
   }
 
   return { tasks, loading, fetchTasks, updateTask, deleteTask };

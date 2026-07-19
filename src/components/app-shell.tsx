@@ -1,11 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
-import { Inbox, Sun, PenLine, LogOut } from "lucide-react";
+import { Inbox, Sun, PenLine } from "lucide-react";
 
 const navItems = [
   { href: "/", label: "Capture", icon: PenLine },
@@ -13,22 +12,8 @@ const navItems = [
   { href: "/today", label: "Today", icon: Sun },
 ];
 
-export function AppShell({
-  userEmail,
-  children,
-}: {
-  userEmail: string;
-  children: React.ReactNode;
-}) {
+export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const router = useRouter();
-  const supabase = createClient();
-
-  async function handleLogout() {
-    await supabase.auth.signOut();
-    router.push("/login");
-    router.refresh();
-  }
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -52,15 +37,9 @@ export function AppShell({
               );
             })}
           </nav>
-
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground hidden sm:inline truncate max-w-[140px]">
-              {userEmail}
-            </span>
-            <Button variant="ghost" size="sm" onClick={handleLogout}>
-              <LogOut className="h-4 w-4" />
-            </Button>
-          </div>
+          <span className="text-sm font-medium text-muted-foreground">
+            AI Planner
+          </span>
         </div>
       </header>
 

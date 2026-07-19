@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
 import Anthropic from "@anthropic-ai/sdk";
 
 const anthropic = new Anthropic({
@@ -12,7 +11,7 @@ function buildSystemPrompt(today: string): string {
 For each task, return:
 - title: a clean, actionable task title (in the same language the user used)
 - priority: "low", "medium", or "high" based on urgency cues
-- due_date: ISO date string (YYYY-MM-DD) or null. Today is ${today}. Interpret relative dates: "завтра"/"tomorrow" = tomorrow, "сьогодні"/"today" = today, "afterтоmorrow"/"післязавтра" = day after tomorrow, etc.
+- due_date: ISO date string (YYYY-MM-DD) or null. Today is ${today}. Interpret relative dates: "завтра"/"tomorrow" = tomorrow, "сьогодні"/"today" = today, etc.
 - scheduled_time: HH:MM format (24h) or null, if the user mentioned a specific time
 
 Rules:
@@ -68,33 +67,8 @@ function validateParsedTasks(data: unknown): { title: string; priority: string; 
 
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get("authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() { return []; },
-          setAll() {},
-        },
-        global: {
-          headers: { Authorization: authHeader },
-        },
-      }
-    );
-
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const body = await request.json();
     const rawInput = body.raw_input?.trim();
-    const source = body.source === "voice" ? "voice" : "text";
 
     if (!rawInput) {
       return NextResponse.json({ error: "Empty input" }, { status: 400 });
@@ -111,27 +85,7 @@ export async function POST(request: NextRequest) {
 
     const tasks = validateParsedTasks(parsed);
 
-    const rows = tasks.map((task) => ({
-      user_id: user.id,
-      raw_input: rawInput,
-      title: task.title,
-      priority: task.priority,
-      due_date: task.due_date,
-      scheduled_time: task.scheduled_time,
-      status: "backlog",
-      source,
-    }));
-
-    const { data: inserted, error: insertError } = await supabase
-      .from("tasks")
-      .insert(rows)
-      .select();
-
-    if (insertError) {
-      return NextResponse.json({ error: insertError.message }, { status: 500 });
-    }
-
-    return NextResponse.json({ tasks: inserted });
+    return NextResponse.json({ tasks });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Internal error";
     return NextResponse.json({ error: message }, { status: 500 });
