@@ -67,6 +67,13 @@ function validateParsedTasks(data: unknown): { title: string; priority: string; 
 
 export async function POST(request: NextRequest) {
   try {
+    if (!process.env.ANTHROPIC_API_KEY) {
+      return NextResponse.json(
+        { error: "ANTHROPIC_API_KEY is not set. Add it in Vercel Environment Variables." },
+        { status: 500 }
+      );
+    }
+
     const body = await request.json();
     const rawInput = body.raw_input?.trim();
 
@@ -84,6 +91,13 @@ export async function POST(request: NextRequest) {
     }
 
     const tasks = validateParsedTasks(parsed);
+
+    if (tasks.length === 0) {
+      return NextResponse.json(
+        { error: "Could not extract any tasks from your input. Try being more specific." },
+        { status: 400 }
+      );
+    }
 
     return NextResponse.json({ tasks });
   } catch (err) {
