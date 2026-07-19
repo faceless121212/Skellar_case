@@ -1,25 +1,42 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { MessageCircle, X, ArrowUp, Loader2, Sparkles } from "lucide-react";
+import { MessageCircle, X, ArrowUp, Loader2, Sparkles, CheckCircle2 } from "lucide-react";
 import { getSelectedModel } from "@/lib/settings";
+import { updateTask as storeUpdateTask, deleteTask as storeDeleteTask, getTasks } from "@/lib/task-store";
+import { toast } from "sonner";
 import type { Task } from "@/lib/types";
+
+interface TaskAction {
+  action: "update" | "delete" | "complete" | "move";
+  task_title: string;
+  updates?: {
+    priority?: "low" | "medium" | "high";
+    due_date?: string | null;
+    scheduled_time?: string | null;
+    estimated_minutes?: number;
+    title?: string;
+    status?: "pending" | "backlog" | "today" | "done";
+  };
+}
 
 interface Message {
   role: "user" | "assistant";
   content: string;
+  actions?: TaskAction[];
+  actionsApplied?: boolean;
 }
 
 const QUICK_PROMPTS: Record<string, string[]> = {
   today: [
     "What should I focus on first?",
     "Am I overloaded today?",
-    "Help me reprioritize",
+    "Mark all high-priority tasks as done",
   ],
   inbox: [
     "Which tasks are most urgent?",
-    "Suggest priorities for these",
-    "Help me organize my inbox",
+    "Set all tasks to high priority",
+    "Move everything to backlog",
   ],
   done: [
     "How productive was I today?",
@@ -33,13 +50,29 @@ const QUICK_PROMPTS: Record<string, string[]> = {
   ],
 };
 
-export function AIAssistant({ page, tasks }: { page: string; tasks: Task[] }) {
+function findTaskByTitle(tasks: Task[], title: string): Task | undefined {
+  const lower = title.toLowerCase();
+  return tasks.find((t) => t.title.toLowerCase() === lower)
+    ?? tasks.find((t) => t.title.toLowerCase().includes(lower))
+    ?? tasks.find((t) => lower.includes(t.title.toLowerCase()));
+}
+
+export function AIAssistant({ page, tasks: initialTasks, onTasksChanged }: {
+  page: string;
+  tasks: Task[];
+  onTasksChanged?: () => void;
+}) {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [liveTasks, setLiveTasks] = useState<Task[]>(initialTasks);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setLiveTasks(initialTasks);
+  }, [initialTasks]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -50,6 +83,55 @@ export function AIAssistant({ page, tasks }: { page: string; tasks: Task[] }) {
       setTimeout(() => inputRef.current?.focus(), 100);
     }
   }, [isOpen]);
+
+  function applyActions(actions: TaskAction[]): number {
+    const allTasks = getTasks();
+    let applied = 0;
+
+    for (const action of actions) {
+      const task = findTaskByTitle(allTasks, action.task_title);
+      if (!task) continue;
+
+      switch (action.action) {
+        case "complete":
+          storeUpdateTask(task.id, { status: "done" });
+          applied++;
+          break;
+        case "delete":
+          storeDeleteTask(task.id);
+          applied++;
+          break;
+        case "move":
+          if (action.updates?.status) {
+            storeUpdateTask(task.id, { status: action.updates.status });
+            applied++;
+          }
+          break;
+        case "update": {
+          const updates: Partial<Task> = {};
+          if (action.updates?.priority) updates.priority = action.updates.priority;
+          if (action.updates?.due_date !== undefined) updates.due_date = action.updates.due_date;
+          if (action.updates?.scheduled_time !== undefined) updates.scheduled_time = action.updates.scheduled_time;
+          if (action.updates?.estimated_minutes) updates.estimated_minutes = action.updates.estimated_minutes;
+          if (action.updates?.title) updates.title = action.updates.title;
+          if (action.updates?.status) updates.status = action.updates.status;
+          if (Object.keys(updates).length > 0) {
+            storeUpdateTask(task.id, updates);
+            applied++;
+          }
+          break;
+        }
+      }
+    }
+
+    if (applied > 0) {
+      setLiveTasks(getTasks());
+      onTasksChanged?.();
+      toast.success(`${applied} task${applied !== 1 ? "s" : ""} updated`);
+    }
+
+    return applied;
+  }
 
   async function sendMessage(text: string) {
     if (!text.trim() || isLoading) return;
@@ -65,7 +147,7 @@ export function AIAssistant({ page, tasks }: { page: string; tasks: Task[] }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: text.trim(),
-          tasks: tasks.map((t) => ({
+          tasks: liveTasks.map((t) => ({
             title: t.title,
             priority: t.priority,
             status: t.status,
@@ -87,9 +169,22 @@ export function AIAssistant({ page, tasks }: { page: string; tasks: Task[] }) {
           { role: "assistant", content: `Error: ${data.error}` },
         ]);
       } else {
+        const actions: TaskAction[] = data.actions ?? [];
+        let actionsApplied = false;
+
+        if (actions.length > 0) {
+          const count = applyActions(actions);
+          actionsApplied = count > 0;
+        }
+
         setMessages((prev) => [
           ...prev,
-          { role: "assistant", content: data.reply },
+          {
+            role: "assistant",
+            content: data.reply,
+            actions: actions.length > 0 ? actions : undefined,
+            actionsApplied,
+          },
         ]);
       }
     } catch {
@@ -113,7 +208,6 @@ export function AIAssistant({ page, tasks }: { page: string; tasks: Task[] }) {
 
   return (
     <>
-      {/* Floating button */}
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
@@ -124,11 +218,9 @@ export function AIAssistant({ page, tasks }: { page: string; tasks: Task[] }) {
         </button>
       )}
 
-      {/* Chat panel */}
       {isOpen && (
         <div className="fixed bottom-20 sm:bottom-6 right-4 sm:right-6 z-50 w-[calc(100vw-2rem)] sm:w-96 animate-fade-in">
           <div className="flex flex-col rounded-2xl border bg-card shadow-2xl overflow-hidden" style={{ maxHeight: "min(500px, calc(100dvh - 140px))" }}>
-            {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b bg-primary/5">
               <div className="flex items-center gap-2">
                 <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
@@ -136,7 +228,7 @@ export function AIAssistant({ page, tasks }: { page: string; tasks: Task[] }) {
                 </div>
                 <div>
                   <p className="text-sm font-semibold">AI Assistant</p>
-                  <p className="text-[10px] text-muted-foreground">Powered by Claude</p>
+                  <p className="text-[10px] text-muted-foreground">Can read & edit your tasks</p>
                 </div>
               </div>
               <button
@@ -147,12 +239,11 @@ export function AIAssistant({ page, tasks }: { page: string; tasks: Task[] }) {
               </button>
             </div>
 
-            {/* Messages */}
             <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3" style={{ minHeight: 200 }}>
               {messages.length === 0 && (
                 <div className="space-y-3">
                   <p className="text-sm text-muted-foreground text-center py-2">
-                    Ask me anything about your tasks
+                    Ask me anything — I can also change your tasks
                   </p>
                   <div className="space-y-1.5">
                     {prompts.map((prompt) => (
@@ -173,14 +264,25 @@ export function AIAssistant({ page, tasks }: { page: string; tasks: Task[] }) {
                   key={i}
                   className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                 >
-                  <div
-                    className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
-                      msg.role === "user"
-                        ? "bg-primary text-primary-foreground rounded-br-md"
-                        : "bg-muted rounded-bl-md"
-                    }`}
-                  >
-                    <p className="whitespace-pre-wrap">{msg.content}</p>
+                  <div className={`max-w-[85%] space-y-1.5`}>
+                    <div
+                      className={`rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
+                        msg.role === "user"
+                          ? "bg-primary text-primary-foreground rounded-br-md"
+                          : "bg-muted rounded-bl-md"
+                      }`}
+                    >
+                      <p className="whitespace-pre-wrap">{msg.content}</p>
+                    </div>
+
+                    {msg.actionsApplied && msg.actions && (
+                      <div className="flex items-center gap-1.5 px-1">
+                        <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                        <span className="text-[10px] text-emerald-600 font-medium">
+                          {msg.actions.length} change{msg.actions.length !== 1 ? "s" : ""} applied
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -196,7 +298,6 @@ export function AIAssistant({ page, tasks }: { page: string; tasks: Task[] }) {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Input */}
             <div className="border-t px-3 py-2.5">
               <div className="flex items-center gap-2">
                 <input
@@ -205,7 +306,7 @@ export function AIAssistant({ page, tasks }: { page: string; tasks: Task[] }) {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Ask about your tasks..."
+                  placeholder="Ask or tell me to change tasks..."
                   className="flex-1 bg-transparent text-sm placeholder:text-muted-foreground/50 focus:outline-none"
                   disabled={isLoading}
                 />
