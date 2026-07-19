@@ -4,13 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { Toaster } from "@/components/ui/sonner";
-import { Inbox, Sun, PenLine, Sparkles, CalendarDays, LogOut } from "lucide-react";
+import { Inbox, Sun, PenLine, Sparkles, CalendarDays, CheckCircle2, LogOut } from "lucide-react";
 import { logout, getUser } from "@/lib/auth";
 
 const navItems = [
   { href: "/", label: "Capture", icon: PenLine },
   { href: "/inbox", label: "Inbox", icon: Inbox },
   { href: "/today", label: "Today", icon: Sun },
+  { href: "/done", label: "Done", icon: CheckCircle2 },
   { href: "/week", label: "Week", icon: CalendarDays },
 ];
 
