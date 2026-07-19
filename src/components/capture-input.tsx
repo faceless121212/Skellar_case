@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Mic, MicOff, ArrowUp, Loader2, WifiOff, ChevronDown, Eye, Zap } from "lucide-react";
+import { Mic, MicOff, ArrowUp, Loader2, WifiOff, ChevronDown, Eye, Zap, Globe } from "lucide-react";
 import { toast } from "sonner";
 import { addTasks } from "@/lib/task-store";
 import { getSelectedModel, setSelectedModel, AVAILABLE_MODELS } from "@/lib/settings";
@@ -15,6 +15,14 @@ interface SpeechRecognitionEvent {
 interface SpeechRecognitionErrorEvent {
   error: string;
 }
+
+const VOICE_LANGS = [
+  { code: "uk-UA", label: "UA" },
+  { code: "en-US", label: "EN" },
+  { code: "ru-RU", label: "RU" },
+  { code: "pl-PL", label: "PL" },
+  { code: "de-DE", label: "DE" },
+];
 
 const PLACEHOLDERS = [
   "Buy groceries, call mom tomorrow at 10, finish report by Friday...",
@@ -37,7 +45,11 @@ export function CaptureInput() {
   const [preview, setPreview] = useState<ParsedTask[] | null>(null);
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [placeholderIdx, setPlaceholderIdx] = useState(0);
+  const [voiceLang, setVoiceLang] = useState("uk-UA");
+  const [showLangs, setShowLangs] = useState(false);
+  const [interim, setInterim] = useState("");
   const recognitionRef = useRef<ReturnType<typeof createSpeechRecognition> | null>(null);
+  const shouldRestartRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -91,44 +103,72 @@ export function CaptureInput() {
     })();
   }
 
-  const toggleRecording = useCallback(() => {
-    if (isRecording) {
-      recognitionRef.current?.stop();
-      setIsRecording(false);
-      return;
-    }
-
+  function startRecognition() {
     const recognition = createSpeechRecognition();
     recognition.continuous = true;
-    recognition.interimResults = false;
-    recognition.lang = navigator.language || "uk-UA";
+    recognition.interimResults = true;
+    recognition.lang = voiceLang;
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
-      let transcript = "";
+      let finalTranscript = "";
+      let interimTranscript = "";
       for (let i = event.resultIndex; i < event.results.length; i++) {
+        const t = event.results[i][0].transcript;
         if (event.results[i].isFinal) {
-          transcript += event.results[i][0].transcript;
+          finalTranscript += t;
+        } else {
+          interimTranscript += t;
         }
       }
-      if (transcript) {
-        setText((prev) => (prev ? prev + " " + transcript : transcript));
+      if (finalTranscript) {
+        setText((prev) => (prev ? prev + " " + finalTranscript : finalTranscript));
         setSource("voice");
+        setInterim("");
+      } else {
+        setInterim(interimTranscript);
       }
     };
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-      if (event.error !== "aborted") {
-        toast.error("Microphone error: " + event.error);
-      }
+      if (event.error === "no-speech" || event.error === "aborted") return;
+      toast.error("Microphone error: " + event.error);
+      shouldRestartRef.current = false;
       setIsRecording(false);
+      setInterim("");
     };
 
-    recognition.onend = () => setIsRecording(false);
+    recognition.onend = () => {
+      if (shouldRestartRef.current) {
+        try {
+          recognition.start();
+        } catch {
+          shouldRestartRef.current = false;
+          setIsRecording(false);
+          setInterim("");
+        }
+      } else {
+        setIsRecording(false);
+        setInterim("");
+      }
+    };
 
     recognitionRef.current = recognition;
     recognition.start();
+  }
+
+  const toggleRecording = useCallback(() => {
+    if (isRecording) {
+      shouldRestartRef.current = false;
+      recognitionRef.current?.stop();
+      setIsRecording(false);
+      setInterim("");
+      return;
+    }
+
+    shouldRestartRef.current = true;
+    startRecognition();
     setIsRecording(true);
-  }, [isRecording]);
+  }, [isRecording, voiceLang]);
 
   async function fetchParsedTasks(rawInput: string): Promise<ParsedTask[]> {
     const res = await fetch("/api/parse-tasks", {
@@ -241,29 +281,74 @@ export function CaptureInput() {
         <div className="flex items-center justify-between px-3 pb-3">
           <div className="flex items-center gap-1">
             {speechSupported && (
-              <button
-                type="button"
-                onClick={toggleRecording}
-                disabled={isSubmitting}
-                className={`
-                  relative flex h-10 w-10 items-center justify-center rounded-full transition-all duration-200
-                  ${isRecording
-                    ? "bg-destructive text-destructive-foreground animate-pulse-ring"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                  }
-                `}
-                title={isRecording ? "Stop recording" : "Voice input"}
-              >
-                {isRecording ? (
-                  <MicOff className="h-4 w-4" />
-                ) : (
-                  <Mic className="h-4 w-4" />
-                )}
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={toggleRecording}
+                  disabled={isSubmitting}
+                  className={`
+                    relative flex h-10 w-10 items-center justify-center rounded-full transition-all duration-200
+                    ${isRecording
+                      ? "bg-destructive text-destructive-foreground animate-pulse-ring"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    }
+                  `}
+                  title={isRecording ? "Stop recording" : "Voice input"}
+                >
+                  {isRecording ? (
+                    <MicOff className="h-4 w-4" />
+                  ) : (
+                    <Mic className="h-4 w-4" />
+                  )}
+                </button>
+
+                {/* Language selector */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowLangs(!showLangs)}
+                    disabled={isSubmitting}
+                    className="flex h-8 items-center gap-0.5 rounded-full px-2 text-[10px] font-bold text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                    title="Voice language"
+                  >
+                    <Globe className="h-3 w-3" />
+                    <span>{VOICE_LANGS.find((l) => l.code === voiceLang)?.label ?? "UA"}</span>
+                  </button>
+                  {showLangs && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setShowLangs(false)} />
+                      <div className="absolute top-full mt-1 left-0 z-50 rounded-xl border bg-card shadow-lg py-1 animate-fade-in">
+                        {VOICE_LANGS.map((l) => (
+                          <button
+                            key={l.code}
+                            onClick={() => {
+                              setVoiceLang(l.code);
+                              setShowLangs(false);
+                              if (isRecording) {
+                                shouldRestartRef.current = false;
+                                recognitionRef.current?.stop();
+                                setTimeout(() => {
+                                  shouldRestartRef.current = true;
+                                  startRecognition();
+                                }, 200);
+                              }
+                            }}
+                            className={`w-full px-3 py-1.5 text-xs text-left hover:bg-muted transition-colors ${
+                              voiceLang === l.code ? "text-primary font-bold" : "text-foreground"
+                            }`}
+                          >
+                            {l.label}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </>
             )}
             {isRecording && (
               <span className="text-xs text-destructive font-medium animate-pulse ml-1">
-                Listening...
+                {interim ? interim : "Listening..."}
               </span>
             )}
 
