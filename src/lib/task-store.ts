@@ -87,6 +87,13 @@ export function updateTask(id: string, updates: Partial<Task>): Task | null {
     updates.completed_at = new Date().toISOString();
   }
 
+  const today = new Date().toISOString().split("T")[0];
+  const newDueDate = updates.due_date !== undefined ? updates.due_date : tasks[idx].due_date;
+  const newStatus = updates.status !== undefined ? updates.status : tasks[idx].status;
+  if (newDueDate && newDueDate !== today && newStatus === "today") {
+    updates.status = "pending";
+  }
+
   tasks[idx] = { ...tasks[idx], ...updates };
   saveTasks(tasks);
   return tasks[idx];
