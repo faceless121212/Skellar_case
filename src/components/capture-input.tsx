@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Mic, MicOff, ArrowUp, Loader2, WifiOff } from "lucide-react";
+import { Mic, MicOff, ArrowUp, Loader2, WifiOff, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { addTasks } from "@/lib/task-store";
+import { getSelectedModel, setSelectedModel, AVAILABLE_MODELS } from "@/lib/settings";
 import type { ParsedTask, TaskSource } from "@/lib/types";
 
 interface SpeechRecognitionEvent {
@@ -22,8 +23,14 @@ export function CaptureInput() {
   const [isOnline, setIsOnline] = useState(true);
   const [speechSupported, setSpeechSupported] = useState(false);
   const [source, setSource] = useState<TaskSource>("text");
+  const [model, setModel] = useState("");
+  const [showModels, setShowModels] = useState(false);
   const recognitionRef = useRef<ReturnType<typeof createSpeechRecognition> | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    setModel(getSelectedModel());
+  }, []);
 
   useEffect(() => {
     setSpeechSupported(
@@ -112,7 +119,7 @@ export function CaptureInput() {
       const res = await fetch("/api/parse-tasks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ raw_input: rawInput, source }),
+        body: JSON.stringify({ raw_input: rawInput, source, model }),
       });
 
       if (!res.ok) {
@@ -219,9 +226,56 @@ export function CaptureInput() {
         </div>
       </div>
 
-      <p className="text-center text-xs text-muted-foreground/60">
-        Press Enter to send &middot; Shift+Enter for new line
-      </p>
+      <div className="flex items-center justify-center gap-3">
+        <p className="text-xs text-muted-foreground/60">
+          Enter to send &middot; Shift+Enter for new line
+        </p>
+        <span className="text-muted-foreground/30">|</span>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setShowModels(!showModels)}
+            className="inline-flex items-center gap-1 rounded-full border border-border/60 px-2.5 py-1 text-[11px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          >
+            {AVAILABLE_MODELS.find((m) => m.id === model)?.name ?? "Model"}
+            <ChevronDown className={`h-3 w-3 transition-transform ${showModels ? "rotate-180" : ""}`} />
+          </button>
+
+          {showModels && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setShowModels(false)} />
+              <div className="absolute bottom-full mb-2 right-0 z-50 w-52 rounded-xl border bg-card shadow-lg py-1 animate-fade-in">
+                <p className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  Models
+                </p>
+                {AVAILABLE_MODELS.map((m, i) => (
+                  <button
+                    key={m.id}
+                    onClick={() => {
+                      setModel(m.id);
+                      setSelectedModel(m.id);
+                      setShowModels(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-muted transition-colors ${
+                      model === m.id ? "text-primary font-medium" : "text-foreground"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span>{m.name}</span>
+                      {m.badge && (
+                        <span className="rounded-md bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold text-primary">
+                          {m.badge}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-xs text-muted-foreground/50">{i + 1}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

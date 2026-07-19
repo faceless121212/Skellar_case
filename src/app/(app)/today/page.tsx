@@ -64,7 +64,7 @@ export default function TodayPage() {
             {allDone
               ? "All done! Great work."
               : total > 0
-                ? `${activeTasks.length} remaining, ${doneTasks.length} completed`
+                ? `${activeTasks.length} task${activeTasks.length !== 1 ? "s" : ""} to do, ${doneTasks.length} done`
                 : "Plan your day to get started"}
           </p>
         </div>
@@ -85,22 +85,30 @@ export default function TodayPage() {
 
       {/* Progress bar + time estimate */}
       {total > 0 && (
-        <div className="space-y-2">
-          <div className="h-2 rounded-full bg-muted overflow-hidden">
+        <div className="space-y-1.5">
+          <div className="h-2.5 rounded-full bg-muted overflow-hidden">
             <div
-              className="h-full rounded-full bg-primary transition-all duration-500 ease-out"
-              style={{ width: `${progress}%` }}
+              className={`h-full rounded-full transition-all duration-500 ease-out ${
+                progress === 100
+                  ? "bg-emerald-500"
+                  : progress > 50
+                    ? "bg-primary"
+                    : progress > 0
+                      ? "bg-primary"
+                      : "bg-muted-foreground/20"
+              }`}
+              style={{ width: `${Math.max(progress, 2)}%` }}
             />
           </div>
           <div className="flex items-center justify-between">
             {totalMinutes > 0 && (
-              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+              <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
                 <Clock className="h-3 w-3" />
-                ~{totalMinutes >= 60 ? `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m` : `${totalMinutes}m`} remaining
+                ~{totalMinutes >= 60 ? `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60 > 0 ? ` ${totalMinutes % 60}m` : ""}` : `${totalMinutes}m`} left
               </span>
             )}
-            <p className="text-xs text-muted-foreground text-right ml-auto">
-              {Math.round(progress)}% complete
+            <p className="text-[11px] text-muted-foreground ml-auto font-medium">
+              {doneTasks.length}/{total} done
             </p>
           </div>
         </div>

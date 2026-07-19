@@ -25,13 +25,23 @@ Rules:
 - Respond with ONLY valid JSON — no markdown fences, no explanation, just a JSON array`;
 }
 
-async function callClaude(rawInput: string, today: string, strict = false): Promise<unknown> {
+const ALLOWED_MODELS = [
+  "claude-fable-5",
+  "claude-opus-4-8",
+  "claude-sonnet-5",
+  "claude-haiku-4-5-20251001",
+  "claude-sonnet-4-6",
+];
+
+async function callClaude(rawInput: string, today: string, strict = false, modelId = "claude-sonnet-5"): Promise<unknown> {
   const systemPrompt = strict
     ? buildSystemPrompt(today) + "\n\nCRITICAL: Respond with ONLY valid JSON. No markdown, no backticks, no explanation. Just a raw JSON array."
     : buildSystemPrompt(today);
 
+  const safeModel = ALLOWED_MODELS.includes(modelId) ? modelId : "claude-sonnet-5";
+
   const message = await anthropic.messages.create({
-    model: "claude-sonnet-4-6",
+    model: safeModel,
     max_tokens: 2048,
     system: systemPrompt,
     messages: [{ role: "user", content: rawInput }],
@@ -85,6 +95,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const rawInput = body.raw_input?.trim();
+    const modelId = body.model || "claude-sonnet-5";
 
     if (!rawInput) {
       return NextResponse.json({ error: "Empty input" }, { status: 400 });
@@ -94,10 +105,10 @@ export async function POST(request: NextRequest) {
 
     let parsed: unknown;
     try {
-      parsed = await callClaude(rawInput, today);
+      parsed = await callClaude(rawInput, today, false, modelId);
     } catch {
       try {
-        parsed = await callClaude(rawInput, today, true);
+        parsed = await callClaude(rawInput, today, true, modelId);
       } catch {
         return NextResponse.json({
           tasks: [{ title: rawInput, priority: "medium", due_date: null, scheduled_time: null, tags: [], estimated_minutes: undefined }],

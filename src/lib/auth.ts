@@ -9,8 +9,7 @@ const VALID_CREDENTIALS = {
 
 export interface AuthUser {
   name: string;
-  email?: string;
-  method: "credentials" | "google";
+  method: "credentials";
 }
 
 export function getUser(): AuthUser | null {
@@ -30,12 +29,6 @@ export function loginWithCredentials(username: string, password: string): AuthUs
     return user;
   }
   return null;
-}
-
-export function loginWithGoogle(name: string, email: string): AuthUser {
-  const user: AuthUser = { name, email, method: "google" };
-  localStorage.setItem(AUTH_KEY, JSON.stringify(user));
-  return user;
 }
 
 export function logout(): void {
