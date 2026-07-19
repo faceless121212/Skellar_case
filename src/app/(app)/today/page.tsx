@@ -139,11 +139,15 @@ export default function TodayPage() {
               className={`h-full rounded-full transition-all duration-500 ease-out ${
                 progress === 100
                   ? "bg-emerald-500"
-                  : progress > 50
-                    ? "bg-primary"
-                    : progress > 0
-                      ? "bg-primary"
-                      : "bg-muted-foreground/20"
+                  : progress >= 75
+                    ? "bg-green-500"
+                    : progress >= 50
+                      ? "bg-yellow-500"
+                      : progress >= 25
+                        ? "bg-orange-500"
+                        : progress > 0
+                          ? "bg-red-500"
+                          : "bg-muted-foreground/20"
               }`}
               style={{ width: `${Math.max(progress, 2)}%` }}
             />
