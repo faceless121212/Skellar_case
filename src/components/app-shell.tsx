@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useRouter } from "next/navigation";
@@ -25,13 +25,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const currentPage = pathname === "/" ? "capture" : pathname.replace("/", "").split("/")[0];
   const showAssistant = currentPage !== "capture" && currentPage !== "task";
+  const [refreshKey, setRefreshKey] = useState(0);
   const tasks = useMemo(() => {
+    void refreshKey;
     if (!showAssistant) return [];
     if (currentPage === "today") return getTasks("today");
     if (currentPage === "inbox") return getTasks("pending");
     if (currentPage === "done") return getTasks("done");
     return getTasks();
-  }, [currentPage, showAssistant]);
+  }, [currentPage, showAssistant, refreshKey]);
+
+  const handleTasksChanged = useCallback(() => {
+    setRefreshKey((k) => k + 1);
+    router.refresh();
+  }, [router]);
 
   function handleLogout() {
     logout();
@@ -124,7 +131,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </nav>
 
-      {showAssistant && <AIAssistant page={currentPage} tasks={tasks} />}
+      {showAssistant && <AIAssistant page={currentPage} tasks={tasks} onTasksChanged={handleTasksChanged} />}
 
       <Toaster
         position="top-center"
