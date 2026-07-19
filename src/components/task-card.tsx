@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Check, X, Pencil, ArrowRight, Clock, Calendar, CheckCircle2, Flag } from "lucide-react";
 import type { Task, TaskPriority } from "@/lib/types";
 
@@ -70,7 +71,10 @@ export function TaskCard({ task, mode, onUpdate, onDelete, index = 0 }: TaskCard
   const [scheduledTime, setScheduledTime] = useState(task.scheduled_time ?? "");
   const isDone = task.status === "done";
   const config = priorityConfig[task.priority];
+  const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
+  const dateRef = useRef<HTMLInputElement>(null);
+  const timeRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (editing && inputRef.current) {
@@ -117,7 +121,6 @@ export function TaskCard({ task, mode, onUpdate, onDelete, index = 0 }: TaskCard
         className="rounded-2xl border border-primary/30 bg-card p-4 shadow-md shadow-primary/5 animate-fade-in"
         onKeyDown={handleKeyDown}
       >
-        {/* Title input */}
         <input
           ref={inputRef}
           value={title}
@@ -126,7 +129,6 @@ export function TaskCard({ task, mode, onUpdate, onDelete, index = 0 }: TaskCard
           className="w-full bg-transparent text-[15px] font-medium placeholder:text-muted-foreground/40 focus:outline-none pb-3 border-b border-border/50"
         />
 
-        {/* Priority chips */}
         <div className="flex items-center gap-4 pt-3">
           <div className="flex items-center gap-1">
             <Flag className="h-3.5 w-3.5 text-muted-foreground/60 mr-1" />
@@ -150,50 +152,62 @@ export function TaskCard({ task, mode, onUpdate, onDelete, index = 0 }: TaskCard
           </div>
         </div>
 
-        {/* Date & time row */}
         <div className="flex items-center gap-2 pt-3 flex-wrap">
-          <label className="relative inline-flex items-center gap-1.5 rounded-lg border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground hover:border-border transition-colors cursor-pointer">
+          {/* Hidden native inputs */}
+          <input
+            ref={dateRef}
+            type="date"
+            value={dueDate}
+            onChange={(e) => setDueDate(e.target.value)}
+            className="sr-only"
+            tabIndex={-1}
+          />
+          <input
+            ref={timeRef}
+            type="time"
+            value={scheduledTime}
+            onChange={(e) => setScheduledTime(e.target.value)}
+            className="sr-only"
+            tabIndex={-1}
+          />
+
+          <button
+            type="button"
+            onClick={() => dateRef.current?.showPicker()}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground hover:border-border hover:bg-muted/50 transition-colors"
+          >
             <Calendar className="h-3.5 w-3.5" />
             <span>{dueDate ? formatDate(dueDate) : "Add date"}</span>
-            <input
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              className="absolute inset-0 w-full opacity-0 cursor-pointer"
-            />
-            {dueDate && (
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); setDueDate(""); }}
-                className="ml-0.5 rounded-full hover:bg-muted p-0.5"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            )}
-          </label>
+          </button>
+          {dueDate && (
+            <button
+              type="button"
+              onClick={() => setDueDate("")}
+              className="flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          )}
 
-          <label className="relative inline-flex items-center gap-1.5 rounded-lg border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground hover:border-border transition-colors cursor-pointer">
+          <button
+            type="button"
+            onClick={() => timeRef.current?.showPicker()}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground hover:border-border hover:bg-muted/50 transition-colors"
+          >
             <Clock className="h-3.5 w-3.5" />
             <span>{scheduledTime ? formatTime(scheduledTime) : "Add time"}</span>
-            <input
-              type="time"
-              value={scheduledTime}
-              onChange={(e) => setScheduledTime(e.target.value)}
-              className="absolute inset-0 w-full opacity-0 cursor-pointer"
-            />
-            {scheduledTime && (
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); setScheduledTime(""); }}
-                className="ml-0.5 rounded-full hover:bg-muted p-0.5"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            )}
-          </label>
+          </button>
+          {scheduledTime && (
+            <button
+              type="button"
+              onClick={() => setScheduledTime("")}
+              className="flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          )}
         </div>
 
-        {/* Actions */}
         <div className="flex items-center justify-between pt-3 mt-1 border-t border-border/30">
           <p className="text-[10px] text-muted-foreground/50">
             Enter to save &middot; Esc to cancel
@@ -245,7 +259,10 @@ export function TaskCard({ task, mode, onUpdate, onDelete, index = 0 }: TaskCard
           </button>
         )}
 
-        <div className="flex-1 min-w-0">
+        <div
+          className="flex-1 min-w-0 cursor-pointer"
+          onClick={() => router.push(`/task/${task.id}`)}
+        >
           <p className={`text-[15px] font-medium leading-snug ${isDone ? "line-through text-muted-foreground" : ""}`}>
             {task.title}
           </p>
@@ -273,10 +290,27 @@ export function TaskCard({ task, mode, onUpdate, onDelete, index = 0 }: TaskCard
                 {formatTime(task.scheduled_time)}
               </span>
             )}
+
+            {task.estimated_minutes && (
+              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium text-muted-foreground bg-muted/50">
+                {task.estimated_minutes}m
+              </span>
+            )}
+
+            {task.tags?.map((tag) => (
+              <span key={tag} className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium text-primary/70 bg-primary/5">
+                #{tag}
+              </span>
+            ))}
+
+            {(task.subtasks?.length ?? 0) > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium text-muted-foreground bg-muted/50">
+                {task.subtasks!.filter((s) => s.done).length}/{task.subtasks!.length}
+              </span>
+            )}
           </div>
         </div>
 
-        {/* Action buttons — always visible on mobile, hover on desktop */}
         <div className="flex items-center gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0">
           {mode === "inbox" && (
             <>

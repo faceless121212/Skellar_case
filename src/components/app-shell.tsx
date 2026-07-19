@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Toaster } from "@/components/ui/sonner";
-import { Inbox, Sun, PenLine, Sparkles } from "lucide-react";
+import { Inbox, Sun, PenLine, Sparkles, CalendarDays } from "lucide-react";
 
 const navItems = [
   { href: "/", label: "Capture", icon: PenLine },
   { href: "/inbox", label: "Inbox", icon: Inbox },
   { href: "/today", label: "Today", icon: Sun },
+  { href: "/week", label: "Week", icon: CalendarDays },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -18,7 +19,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen flex-col pb-16 sm:pb-0">
       {/* Desktop header */}
       <header className="hidden sm:block border-b bg-background/80 backdrop-blur-xl sticky top-0 z-50">
-        <div className="mx-auto flex h-16 max-w-2xl items-center justify-between px-6">
+        <div className="mx-auto flex h-16 max-w-3xl items-center justify-between px-6">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
               <Sparkles className="h-4 w-4" />
@@ -54,7 +55,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </header>
 
       {/* Main content */}
-      <main className="mx-auto w-full max-w-2xl flex-1 px-4 sm:px-6 py-6 sm:py-8">
+      <main className="mx-auto w-full max-w-3xl flex-1 px-4 sm:px-6 py-6 sm:py-8">
         {children}
       </main>
 
@@ -69,7 +70,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 key={href}
                 href={href}
                 className={`
-                  flex flex-col items-center gap-0.5 rounded-xl px-4 py-2 transition-all duration-200
+                  flex flex-col items-center gap-0.5 rounded-xl px-3 py-2 transition-all duration-200
                   ${isActive
                     ? "text-primary"
                     : "text-muted-foreground"

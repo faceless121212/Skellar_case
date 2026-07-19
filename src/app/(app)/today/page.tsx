@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useTasks } from "@/lib/use-tasks";
 import { TaskCard } from "@/components/task-card";
-import { planMyDay } from "@/lib/task-store";
-import { Loader2, Sun, Sparkles, Trophy } from "lucide-react";
+import { planMyDay, carryOverUnfinished } from "@/lib/task-store";
+import { Loader2, Sun, Sparkles, Trophy, RotateCcw, Clock } from "lucide-react";
 import { toast } from "sonner";
+import type { Task } from "@/lib/types";
 
 export default function TodayPage() {
   const { tasks, loading, updateTask, fetchTasks } = useTasks("today");
@@ -18,20 +19,30 @@ export default function TodayPage() {
   const progress = total > 0 ? (doneTasks.length / total) * 100 : 0;
   const allDone = total > 0 && activeTasks.length === 0;
 
+  const totalMinutes = useMemo(() => {
+    return activeTasks.reduce((sum, t) => sum + (t.estimated_minutes ?? 0), 0);
+  }, [activeTasks]);
+
   function handlePlanMyDay() {
     setPlanning(true);
+    const carried = carryOverUnfinished();
+    if (carried > 0) {
+      toast.info(`${carried} overdue task${carried !== 1 ? "s" : ""} carried over to today`);
+    }
     const moved = planMyDay();
     if (moved > 0) {
       toast.success(`${moved} task${moved !== 1 ? "s" : ""} moved to Today`);
       fetchTasks();
       fetchBacklog();
-    } else {
+    } else if (carried === 0) {
       toast.info("No tasks to plan. Confirm some in Inbox first!");
+    } else {
+      fetchTasks();
     }
     setPlanning(false);
   }
 
-  async function handleBacklogUpdate(id: string, updates: Partial<import("@/lib/types").Task>) {
+  async function handleBacklogUpdate(id: string, updates: Partial<Task>) {
     const result = await updateBacklog(id, updates);
     if (updates.status === "today") {
       fetchTasks();
@@ -67,7 +78,7 @@ export default function TodayPage() {
         </button>
       </div>
 
-      {/* Progress bar */}
+      {/* Progress bar + time estimate */}
       {total > 0 && (
         <div className="space-y-2">
           <div className="h-2 rounded-full bg-muted overflow-hidden">
@@ -76,9 +87,17 @@ export default function TodayPage() {
               style={{ width: `${progress}%` }}
             />
           </div>
-          <p className="text-xs text-muted-foreground text-right">
-            {Math.round(progress)}% complete
-          </p>
+          <div className="flex items-center justify-between">
+            {totalMinutes > 0 && (
+              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                <Clock className="h-3 w-3" />
+                ~{totalMinutes >= 60 ? `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m` : `${totalMinutes}m`} remaining
+              </span>
+            )}
+            <p className="text-xs text-muted-foreground text-right ml-auto">
+              {Math.round(progress)}% complete
+            </p>
+          </div>
         </div>
       )}
 

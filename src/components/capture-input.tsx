@@ -122,10 +122,6 @@ export function CaptureInput() {
 
       const data = await res.json();
       const parsed: ParsedTask[] = data.tasks;
-      if (parsed.length === 0) {
-        toast.info("No tasks found. Try describing what you need to do.");
-        return;
-      }
       addTasks(parsed, rawInput, source);
       setText("");
       setSource("text");

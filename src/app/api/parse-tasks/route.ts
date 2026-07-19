@@ -13,8 +13,11 @@ For each task, return:
 - priority: "low", "medium", or "high" based on urgency cues
 - due_date: ISO date string (YYYY-MM-DD) or null. Today is ${today}. Interpret relative dates: "завтра"/"tomorrow" = tomorrow, "сьогодні"/"today" = today, etc.
 - scheduled_time: HH:MM format (24h) or null, if the user mentioned a specific time
+- tags: array of 1-3 short category tags (e.g. ["work"], ["shopping"], ["health", "personal"]). Always assign at least one tag based on the task content.
+- estimated_minutes: estimated time in minutes to complete the task (e.g. 15, 30, 60). Use your best judgment.
 
 Rules:
+- ALWAYS return at least one task, even if the input is unclear or seems like gibberish — use the raw text as the task title
 - One text dump may contain multiple tasks — split them into separate items
 - If no urgency cue is given, default to "medium"
 - If the user explicitly says something is not urgent ("не терміново", "not urgent", "low priority"), set priority to "low"
@@ -46,7 +49,7 @@ async function callClaude(rawInput: string, today: string, strict = false): Prom
   return JSON.parse(cleaned);
 }
 
-function validateParsedTasks(data: unknown): { title: string; priority: string; due_date: string | null; scheduled_time: string | null }[] {
+function validateParsedTasks(data: unknown): { title: string; priority: string; due_date: string | null; scheduled_time: string | null; tags: string[]; estimated_minutes: number | undefined }[] {
   if (!Array.isArray(data)) throw new Error("Expected array");
 
   return data.map((item: Record<string, unknown>) => {
@@ -56,11 +59,17 @@ function validateParsedTasks(data: unknown): { title: string; priority: string; 
     const priority = ["low", "medium", "high"].includes(item.priority as string)
       ? (item.priority as string)
       : "medium";
+    const tags = Array.isArray(item.tags)
+      ? (item.tags as unknown[]).filter((t): t is string => typeof t === "string")
+      : [];
+    const estimated_minutes = typeof item.estimated_minutes === "number" ? item.estimated_minutes : undefined;
     return {
       title: item.title,
       priority,
       due_date: typeof item.due_date === "string" ? item.due_date : null,
       scheduled_time: typeof item.scheduled_time === "string" ? item.scheduled_time : null,
+      tags,
+      estimated_minutes,
     };
   });
 }
@@ -87,16 +96,19 @@ export async function POST(request: NextRequest) {
     try {
       parsed = await callClaude(rawInput, today);
     } catch {
-      parsed = await callClaude(rawInput, today, true);
+      try {
+        parsed = await callClaude(rawInput, today, true);
+      } catch {
+        return NextResponse.json({
+          tasks: [{ title: rawInput, priority: "medium", due_date: null, scheduled_time: null, tags: [], estimated_minutes: undefined }],
+        });
+      }
     }
 
-    const tasks = validateParsedTasks(parsed);
+    let tasks = validateParsedTasks(parsed);
 
     if (tasks.length === 0) {
-      return NextResponse.json(
-        { error: "Could not extract any tasks from your input. Try being more specific." },
-        { status: 400 }
-      );
+      tasks = [{ title: rawInput, priority: "medium", due_date: null, scheduled_time: null, tags: [], estimated_minutes: undefined }];
     }
 
     return NextResponse.json({ tasks });
