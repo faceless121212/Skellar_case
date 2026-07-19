@@ -43,7 +43,7 @@ export function addTasks(
     priority: t.priority,
     due_date: t.due_date,
     scheduled_time: t.scheduled_time,
-    status: "backlog" as TaskStatus,
+    status: "pending" as TaskStatus,
     source,
     created_at: now,
     completed_at: null,

@@ -1,5 +1,5 @@
 export type TaskPriority = "low" | "medium" | "high";
-export type TaskStatus = "backlog" | "today" | "done";
+export type TaskStatus = "pending" | "backlog" | "today" | "done";
 export type TaskSource = "voice" | "text";
 
 export interface Task {

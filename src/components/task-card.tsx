@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, X, Pencil, ArrowRight, Clock, Calendar } from "lucide-react";
+import { Check, X, Pencil, ArrowRight, Clock, Calendar, CheckCircle2 } from "lucide-react";
 import type { Task, TaskPriority } from "@/lib/types";
 
 const priorityConfig: Record<TaskPriority, { dot: string; bg: string; label: string }> = {
@@ -145,8 +145,8 @@ export function TaskCard({ task, mode, onUpdate, onDelete, index = 0 }: TaskCard
               <ActionButton onClick={() => setEditing(true)} title="Edit">
                 <Pencil className="h-3.5 w-3.5" />
               </ActionButton>
-              <ActionButton onClick={() => onUpdate(task.id, { status: "today" })} title="Add to today" accent>
-                <ArrowRight className="h-3.5 w-3.5" />
+              <ActionButton onClick={() => onUpdate(task.id, { status: "backlog" })} title="Confirm" accent>
+                <CheckCircle2 className="h-3.5 w-3.5" />
               </ActionButton>
               <ActionButton onClick={() => onDelete?.(task.id)} title="Discard" destructive>
                 <X className="h-3.5 w-3.5" />

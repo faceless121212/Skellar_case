@@ -5,7 +5,7 @@ import { TaskCard } from "@/components/task-card";
 import { Loader2, Inbox as InboxIcon } from "lucide-react";
 
 export default function InboxPage() {
-  const { tasks, loading, updateTask, deleteTask } = useTasks("backlog");
+  const { tasks, loading, updateTask, deleteTask } = useTasks("pending");
 
   return (
     <div className="space-y-6 animate-fade-in">

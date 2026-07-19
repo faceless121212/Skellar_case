@@ -9,6 +9,7 @@ import { toast } from "sonner";
 
 export default function TodayPage() {
   const { tasks, loading, updateTask, fetchTasks } = useTasks("today");
+  const { tasks: backlogTasks, updateTask: updateBacklog, fetchTasks: fetchBacklog } = useTasks("backlog");
   const [planning, setPlanning] = useState(false);
 
   const activeTasks = tasks.filter((t) => t.status !== "done");
@@ -23,10 +24,19 @@ export default function TodayPage() {
     if (moved > 0) {
       toast.success(`${moved} task${moved !== 1 ? "s" : ""} moved to Today`);
       fetchTasks();
+      fetchBacklog();
     } else {
-      toast.info("No tasks to plan. Add some in Capture first!");
+      toast.info("No tasks to plan. Confirm some in Inbox first!");
     }
     setPlanning(false);
+  }
+
+  async function handleBacklogUpdate(id: string, updates: Partial<import("@/lib/types").Task>) {
+    const result = await updateBacklog(id, updates);
+    if (updates.status === "today") {
+      fetchTasks();
+    }
+    return result;
   }
 
   return (
@@ -132,6 +142,28 @@ export default function TodayPage() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Backlog section */}
+      {backlogTasks.length > 0 && (
+        <div className="space-y-2 pt-2">
+          <div className="flex items-center gap-2">
+            <div className="h-px flex-1 bg-border" />
+            <span className="text-xs font-medium text-muted-foreground px-2">
+              Backlog ({backlogTasks.length})
+            </span>
+            <div className="h-px flex-1 bg-border" />
+          </div>
+          {backlogTasks.map((task, i) => (
+            <TaskCard
+              key={task.id}
+              task={task}
+              mode="backlog"
+              onUpdate={handleBacklogUpdate}
+              index={i}
+            />
+          ))}
         </div>
       )}
     </div>
