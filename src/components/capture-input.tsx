@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Mic, MicOff, Send, Loader2, WifiOff } from "lucide-react";
+import { Mic, MicOff, ArrowUp, Loader2, WifiOff } from "lucide-react";
 import { toast } from "sonner";
 import { addTasks } from "@/lib/task-store";
 import type { ParsedTask, TaskSource } from "@/lib/types";
@@ -24,13 +23,13 @@ export function CaptureInput() {
   const [speechSupported, setSpeechSupported] = useState(false);
   const [source, setSource] = useState<TaskSource>("text");
   const recognitionRef = useRef<ReturnType<typeof createSpeechRecognition> | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     setSpeechSupported(
       "webkitSpeechRecognition" in window || "SpeechRecognition" in window
     );
     setIsOnline(navigator.onLine);
-
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
     window.addEventListener("online", handleOnline);
@@ -41,11 +40,19 @@ export function CaptureInput() {
     };
   }, []);
 
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height =
+        Math.min(textareaRef.current.scrollHeight, 200) + "px";
+    }
+  }, [text]);
+
   function createSpeechRecognition() {
-    const SpeechRecognition =
+    const SR =
       (window as unknown as Record<string, unknown>).SpeechRecognition ||
       (window as unknown as Record<string, unknown>).webkitSpeechRecognition;
-    return new (SpeechRecognition as new () => {
+    return new (SR as new () => {
       continuous: boolean;
       interimResults: boolean;
       lang: string;
@@ -89,9 +96,7 @@ export function CaptureInput() {
       setIsRecording(false);
     };
 
-    recognition.onend = () => {
-      setIsRecording(false);
-    };
+    recognition.onend = () => setIsRecording(false);
 
     recognitionRef.current = recognition;
     recognition.start();
@@ -103,7 +108,6 @@ export function CaptureInput() {
     if (!rawInput || !isOnline) return;
 
     setIsSubmitting(true);
-
     try {
       const res = await fetch("/api/parse-tasks", {
         method: "POST",
@@ -118,11 +122,10 @@ export function CaptureInput() {
 
       const data = await res.json();
       const parsed: ParsedTask[] = data.tasks;
-
       addTasks(parsed, rawInput, source);
       setText("");
       setSource("text");
-      toast.success(`${parsed.length} task(s) added to Inbox`);
+      toast.success(`${parsed.length} task${parsed.length !== 1 ? "s" : ""} added to Inbox`);
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Something went wrong. Try again."
@@ -139,80 +142,86 @@ export function CaptureInput() {
     }
   }
 
+  const canSubmit = text.trim().length > 0 && !isSubmitting && isOnline;
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {!isOnline && (
-        <div className="flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          <WifiOff className="h-4 w-4" />
-          No connection. Send is disabled until you&apos;re back online.
+        <div className="flex items-center gap-2 rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive animate-fade-in">
+          <WifiOff className="h-4 w-4 shrink-0" />
+          You&apos;re offline. Send is paused.
         </div>
       )}
 
-      <div className="relative">
+      <div className="rounded-2xl border-2 border-border bg-card shadow-sm transition-all duration-200 focus-within:border-primary/50 focus-within:shadow-md focus-within:shadow-primary/5">
         <textarea
+          ref={textareaRef}
           value={text}
           onChange={(e) => {
             setText(e.target.value);
-            if (source === "voice" && e.target.value !== text) {
-              setSource("text");
-            }
+            if (source === "voice") setSource("text");
           }}
           onKeyDown={handleKeyDown}
-          placeholder="What's on your mind? Dump everything here..."
-          rows={5}
-          className="w-full resize-none rounded-lg border border-input bg-background px-4 py-3 pr-24 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          placeholder="Buy groceries, call mom tomorrow at 10, finish report by Friday..."
+          rows={3}
+          className="w-full resize-none bg-transparent px-5 pt-5 pb-2 text-base leading-relaxed placeholder:text-muted-foreground/50 focus:outline-none"
           disabled={isSubmitting}
         />
 
-        <div className="absolute bottom-3 right-3 flex items-center gap-1.5">
-          {speechSupported && (
-            <Button
-              type="button"
-              variant={isRecording ? "destructive" : "outline"}
-              size="icon"
-              className="h-9 w-9"
-              onClick={toggleRecording}
-              disabled={isSubmitting}
-              title={isRecording ? "Stop recording" : "Start voice input"}
-            >
-              {isRecording ? (
-                <MicOff className="h-4 w-4" />
-              ) : (
-                <Mic className="h-4 w-4" />
-              )}
-            </Button>
-          )}
+        <div className="flex items-center justify-between px-3 pb-3">
+          <div className="flex items-center gap-1">
+            {speechSupported && (
+              <button
+                type="button"
+                onClick={toggleRecording}
+                disabled={isSubmitting}
+                className={`
+                  relative flex h-10 w-10 items-center justify-center rounded-full transition-all duration-200
+                  ${isRecording
+                    ? "bg-destructive text-destructive-foreground animate-pulse-ring"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  }
+                `}
+                title={isRecording ? "Stop recording" : "Voice input"}
+              >
+                {isRecording ? (
+                  <MicOff className="h-4 w-4" />
+                ) : (
+                  <Mic className="h-4 w-4" />
+                )}
+              </button>
+            )}
+            {isRecording && (
+              <span className="text-xs text-destructive font-medium animate-pulse ml-1">
+                Listening...
+              </span>
+            )}
+          </div>
 
-          {!speechSupported && (
-            <span
-              className="text-xs text-muted-foreground"
-              title="Voice input is not supported in this browser"
-            >
-              No mic
-            </span>
-          )}
-
-          <Button
+          <button
             type="button"
-            size="icon"
-            className="h-9 w-9"
             onClick={handleSubmit}
-            disabled={!text.trim() || isSubmitting || !isOnline}
+            disabled={!canSubmit}
+            className={`
+              flex h-10 w-10 items-center justify-center rounded-full transition-all duration-200
+              ${canSubmit
+                ? "bg-primary text-primary-foreground shadow-sm hover:opacity-90 active:scale-95"
+                : "bg-muted text-muted-foreground cursor-not-allowed"
+              }
+            `}
           >
             {isSubmitting ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <Send className="h-4 w-4" />
+              <ArrowUp className="h-4 w-4 stroke-[2.5]" />
             )}
-          </Button>
+          </button>
         </div>
       </div>
 
-      {isRecording && (
-        <p className="text-sm text-muted-foreground animate-pulse">
-          Listening... Speak freely, text will be appended.
-        </p>
-      )}
+      <p className="text-center text-xs text-muted-foreground/60">
+        Press Enter to send &middot; Shift+Enter for new line
+      </p>
     </div>
   );
 }

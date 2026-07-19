@@ -1,14 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Check, X, Pencil, ArrowRight } from "lucide-react";
+import { Check, X, Pencil, ArrowRight, Clock, Calendar } from "lucide-react";
 import type { Task, TaskPriority } from "@/lib/types";
 
-const priorityColors: Record<TaskPriority, string> = {
-  high: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-  medium: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
-  low: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+const priorityConfig: Record<TaskPriority, { dot: string; bg: string; label: string }> = {
+  high: { dot: "bg-red-500", bg: "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400", label: "High" },
+  medium: { dot: "bg-amber-500", bg: "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400", label: "Medium" },
+  low: { dot: "bg-emerald-500", bg: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400", label: "Low" },
 };
 
 interface TaskCardProps {
@@ -16,14 +15,17 @@ interface TaskCardProps {
   mode: "inbox" | "today" | "backlog";
   onUpdate: (id: string, updates: Partial<Task>) => Promise<boolean | undefined>;
   onDelete?: (id: string) => Promise<boolean | undefined>;
+  index?: number;
 }
 
-export function TaskCard({ task, mode, onUpdate, onDelete }: TaskCardProps) {
+export function TaskCard({ task, mode, onUpdate, onDelete, index = 0 }: TaskCardProps) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(task.title);
   const [priority, setPriority] = useState<TaskPriority>(task.priority);
   const [dueDate, setDueDate] = useState(task.due_date ?? "");
   const [scheduledTime, setScheduledTime] = useState(task.scheduled_time ?? "");
+  const isDone = task.status === "done";
+  const config = priorityConfig[task.priority];
 
   function handleSave() {
     onUpdate(task.id, {
@@ -35,28 +37,20 @@ export function TaskCard({ task, mode, onUpdate, onDelete }: TaskCardProps) {
     setEditing(false);
   }
 
-  function handleDone() {
-    onUpdate(task.id, { status: "done" });
-  }
-
-  function handleAddToToday() {
-    onUpdate(task.id, { status: "today" });
-  }
-
   if (editing) {
     return (
-      <div className="rounded-lg border bg-card p-4 space-y-3">
+      <div className="rounded-xl border-2 border-primary/20 bg-card p-4 space-y-3 shadow-sm animate-fade-in">
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/30"
           autoFocus
         />
         <div className="flex flex-wrap gap-2">
           <select
             value={priority}
             onChange={(e) => setPriority(e.target.value as TaskPriority)}
-            className="rounded-md border border-input bg-background px-2 py-1 text-sm"
+            className="rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
           >
             <option value="low">Low</option>
             <option value="medium">Medium</option>
@@ -66,86 +60,148 @@ export function TaskCard({ task, mode, onUpdate, onDelete }: TaskCardProps) {
             type="date"
             value={dueDate}
             onChange={(e) => setDueDate(e.target.value)}
-            className="rounded-md border border-input bg-background px-2 py-1 text-sm"
+            className="rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
           <input
             type="time"
             value={scheduledTime}
             onChange={(e) => setScheduledTime(e.target.value)}
-            className="rounded-md border border-input bg-background px-2 py-1 text-sm"
+            className="rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
         </div>
         <div className="flex gap-2">
-          <Button size="sm" onClick={handleSave}>
+          <button
+            onClick={handleSave}
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+          >
             Save
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => setEditing(false)}>
+          </button>
+          <button
+            onClick={() => setEditing(false)}
+            className="rounded-lg border border-input px-4 py-2 text-sm font-medium hover:bg-muted transition-colors"
+          >
             Cancel
-          </Button>
+          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="rounded-lg border bg-card p-4 flex items-start gap-3 group">
-      {mode === "today" && (
-        <button
-          onClick={handleDone}
-          className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-muted-foreground/40 hover:border-primary hover:bg-primary/10 transition-colors"
-          title="Mark as done"
-        >
-          {task.status === "done" && <Check className="h-3 w-3" />}
-        </button>
-      )}
+    <div
+      className={`
+        group rounded-xl border bg-card p-4 transition-all duration-200
+        hover:shadow-sm hover:border-border/80
+        ${isDone ? "opacity-60" : ""}
+      `}
+      style={{ animationDelay: `${index * 50}ms` }}
+    >
+      <div className="flex items-start gap-3">
+        {mode === "today" && (
+          <button
+            onClick={() => onUpdate(task.id, { status: isDone ? "today" : "done" })}
+            className={`
+              mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-200
+              ${isDone
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-muted-foreground/30 hover:border-primary hover:bg-primary/10"
+              }
+            `}
+          >
+            {isDone && <Check className="h-3 w-3 stroke-[3]" />}
+          </button>
+        )}
 
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className={`text-sm font-medium ${task.status === "done" ? "line-through text-muted-foreground" : ""}`}>
+        <div className="flex-1 min-w-0">
+          <p className={`text-sm font-medium leading-snug ${isDone ? "line-through text-muted-foreground" : ""}`}>
             {task.title}
-          </span>
-          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${priorityColors[task.priority]}`}>
-            {task.priority}
-          </span>
+          </p>
+
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
+            <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold ${config.bg}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${config.dot}`} />
+              {config.label}
+            </span>
+
+            {task.due_date && (
+              <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                <Calendar className="h-3 w-3" />
+                {task.due_date}
+              </span>
+            )}
+
+            {task.scheduled_time && (
+              <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                <Clock className="h-3 w-3" />
+                {task.scheduled_time}
+              </span>
+            )}
+          </div>
         </div>
 
-        <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-          {task.due_date && <span>{task.due_date}</span>}
-          {task.scheduled_time && <span>{task.scheduled_time}</span>}
-          {task.source === "voice" && <span>via voice</span>}
+        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+          {mode === "inbox" && (
+            <>
+              <ActionButton onClick={() => setEditing(true)} title="Edit">
+                <Pencil className="h-3.5 w-3.5" />
+              </ActionButton>
+              <ActionButton onClick={() => onUpdate(task.id, { status: "today" })} title="Add to today" accent>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </ActionButton>
+              <ActionButton onClick={() => onDelete?.(task.id)} title="Discard" destructive>
+                <X className="h-3.5 w-3.5" />
+              </ActionButton>
+            </>
+          )}
+          {mode === "today" && !isDone && (
+            <ActionButton onClick={() => setEditing(true)} title="Edit">
+              <Pencil className="h-3.5 w-3.5" />
+            </ActionButton>
+          )}
+          {mode === "backlog" && (
+            <>
+              <ActionButton onClick={() => onUpdate(task.id, { status: "today" })} title="Add to today" accent>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </ActionButton>
+              <ActionButton onClick={() => setEditing(true)} title="Edit">
+                <Pencil className="h-3.5 w-3.5" />
+              </ActionButton>
+            </>
+          )}
         </div>
-      </div>
-
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-        {mode === "inbox" && (
-          <>
-            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditing(true)} title="Edit">
-              <Pencil className="h-3.5 w-3.5" />
-            </Button>
-            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={handleAddToToday} title="Add to today">
-              <ArrowRight className="h-3.5 w-3.5" />
-            </Button>
-            <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => onDelete?.(task.id)} title="Discard">
-              <X className="h-3.5 w-3.5" />
-            </Button>
-          </>
-        )}
-        {mode === "today" && task.status !== "done" && (
-          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditing(true)} title="Edit">
-            <Pencil className="h-3.5 w-3.5" />
-          </Button>
-        )}
-        {mode === "backlog" && (
-          <>
-            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={handleAddToToday} title="Add to today">
-              <ArrowRight className="h-3.5 w-3.5" />
-            </Button>
-            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditing(true)} title="Edit">
-              <Pencil className="h-3.5 w-3.5" />
-            </Button>
-          </>
-        )}
       </div>
     </div>
+  );
+}
+
+function ActionButton({
+  onClick,
+  title,
+  children,
+  accent,
+  destructive,
+}: {
+  onClick: () => void;
+  title: string;
+  children: React.ReactNode;
+  accent?: boolean;
+  destructive?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className={`
+        flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-150 active:scale-90
+        ${destructive
+          ? "text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+          : accent
+            ? "text-muted-foreground hover:text-primary hover:bg-primary/10"
+            : "text-muted-foreground hover:text-foreground hover:bg-muted"
+        }
+      `}
+    >
+      {children}
+    </button>
   );
 }

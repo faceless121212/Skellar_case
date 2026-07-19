@@ -3,9 +3,8 @@
 import { useState } from "react";
 import { useTasks } from "@/lib/use-tasks";
 import { TaskCard } from "@/components/task-card";
-import { Button } from "@/components/ui/button";
 import { planMyDay } from "@/lib/task-store";
-import { Loader2, Sun, Sparkles } from "lucide-react";
+import { Loader2, Sun, Sparkles, Trophy } from "lucide-react";
 import { toast } from "sonner";
 
 export default function TodayPage() {
@@ -14,12 +13,15 @@ export default function TodayPage() {
 
   const activeTasks = tasks.filter((t) => t.status !== "done");
   const doneTasks = tasks.filter((t) => t.status === "done");
+  const total = tasks.length;
+  const progress = total > 0 ? (doneTasks.length / total) * 100 : 0;
+  const allDone = total > 0 && activeTasks.length === 0;
 
   function handlePlanMyDay() {
     setPlanning(true);
     const moved = planMyDay();
     if (moved > 0) {
-      toast.success(`${moved} task(s) moved to Today`);
+      toast.success(`${moved} task${moved !== 1 ? "s" : ""} moved to Today`);
       fetchTasks();
     } else {
       toast.info("No tasks to plan. Add some in Capture first!");
@@ -28,47 +30,83 @@ export default function TodayPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Today</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Today</h1>
           <p className="text-muted-foreground mt-1">
-            {activeTasks.length} task{activeTasks.length !== 1 ? "s" : ""} to go
-            {doneTasks.length > 0 && `, ${doneTasks.length} done`}
+            {allDone
+              ? "All done! Great work."
+              : total > 0
+                ? `${activeTasks.length} remaining, ${doneTasks.length} completed`
+                : "Plan your day to get started"}
           </p>
         </div>
-        <Button onClick={handlePlanMyDay} disabled={planning} className="gap-1.5">
+        <button
+          onClick={handlePlanMyDay}
+          disabled={planning}
+          className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-sm transition-all duration-200 hover:opacity-90 active:scale-95 disabled:opacity-50 shrink-0"
+        >
           {planning ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <Sparkles className="h-4 w-4" />
           )}
-          Plan my day
-        </Button>
+          <span className="hidden sm:inline">Plan my day</span>
+          <span className="sm:hidden">Plan</span>
+        </button>
       </div>
 
+      {/* Progress bar */}
+      {total > 0 && (
+        <div className="space-y-2">
+          <div className="h-2 rounded-full bg-muted overflow-hidden">
+            <div
+              className="h-full rounded-full bg-primary transition-all duration-500 ease-out"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground text-right">
+            {Math.round(progress)}% complete
+          </p>
+        </div>
+      )}
+
       {loading ? (
-        <div className="flex justify-center py-12">
+        <div className="flex justify-center py-20">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
-      ) : tasks.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <Sun className="h-12 w-12 text-muted-foreground/40 mb-3" />
-          <p className="text-muted-foreground">No tasks for today</p>
-          <p className="text-sm text-muted-foreground/60">
-            Hit &quot;Plan my day&quot; to pull in tasks from your backlog.
+      ) : allDone ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center animate-slide-up">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 mb-4">
+            <Trophy className="h-7 w-7 text-primary" />
+          </div>
+          <p className="font-medium text-foreground/80">Day complete!</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            You finished all {total} task{total !== 1 ? "s" : ""}. Nice work.
+          </p>
+        </div>
+      ) : total === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center animate-fade-in">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted/50 mb-4">
+            <Sun className="h-7 w-7 text-muted-foreground/50" />
+          </div>
+          <p className="font-medium text-foreground/80">No tasks for today</p>
+          <p className="text-sm text-muted-foreground mt-1 max-w-[260px]">
+            Hit &quot;Plan my day&quot; to pull tasks from your backlog, or add some in Capture.
           </p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-6">
           {activeTasks.length > 0 && (
             <div className="space-y-2">
-              {activeTasks.map((task) => (
+              {activeTasks.map((task, i) => (
                 <TaskCard
                   key={task.id}
                   task={task}
                   mode="today"
                   onUpdate={updateTask}
+                  index={i}
                 />
               ))}
             </div>
@@ -76,15 +114,20 @@ export default function TodayPage() {
 
           {doneTasks.length > 0 && (
             <div className="space-y-2">
-              <p className="text-sm font-medium text-muted-foreground pt-4">
-                Completed ({doneTasks.length})
-              </p>
-              {doneTasks.map((task) => (
+              <div className="flex items-center gap-2 pt-2">
+                <div className="h-px flex-1 bg-border" />
+                <span className="text-xs font-medium text-muted-foreground px-2">
+                  Completed ({doneTasks.length})
+                </span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+              {doneTasks.map((task, i) => (
                 <TaskCard
                   key={task.id}
                   task={task}
                   mode="today"
                   onUpdate={updateTask}
+                  index={i}
                 />
               ))}
             </div>
