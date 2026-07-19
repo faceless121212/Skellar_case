@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Toaster } from "@/components/ui/sonner";
-import { Inbox, Sun, PenLine, Sparkles, CalendarDays } from "lucide-react";
+import { Inbox, Sun, PenLine, Sparkles, CalendarDays, LogOut } from "lucide-react";
+import { logout, getUser } from "@/lib/auth";
 
 const navItems = [
   { href: "/", label: "Capture", icon: PenLine },
@@ -14,6 +16,13 @@ const navItems = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const user = getUser();
+
+  function handleLogout() {
+    logout();
+    router.replace("/login");
+  }
 
   return (
     <div className="flex min-h-screen flex-col pb-16 sm:pb-0">
@@ -50,7 +59,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             })}
           </nav>
 
-          <div className="w-[88px]" />
+          <div className="flex items-center gap-2">
+            {user && (
+              <span className="text-xs text-muted-foreground truncate max-w-[80px]">
+                {user.name}
+              </span>
+            )}
+            <button
+              onClick={handleLogout}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              title="Sign out"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </header>
 
@@ -87,6 +109,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <Toaster
         position="top-center"
+        duration={1000}
         toastOptions={{
           className: "rounded-xl shadow-lg border",
         }}

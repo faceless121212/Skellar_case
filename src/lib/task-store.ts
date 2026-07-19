@@ -164,6 +164,27 @@ export function planMyDay(): number {
   return moved;
 }
 
+export function autoCompleteOverdue(): number {
+  const tasks = loadTasks();
+  const now = new Date();
+  const todayStr = now.toISOString().split("T")[0];
+  const currentTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  let completed = 0;
+
+  const updated = tasks.map((t) => {
+    if (t.status === "today" && t.scheduled_time && t.due_date) {
+      if (t.due_date < todayStr || (t.due_date === todayStr && t.scheduled_time < currentTime)) {
+        completed++;
+        return { ...t, status: "done" as TaskStatus, completed_at: now.toISOString() };
+      }
+    }
+    return t;
+  });
+
+  if (completed > 0) saveTasks(updated);
+  return completed;
+}
+
 export function carryOverUnfinished(): number {
   const tasks = loadTasks();
   const today = new Date().toISOString().split("T")[0];

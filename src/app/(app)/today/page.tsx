@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useTasks } from "@/lib/use-tasks";
 import { TaskCard } from "@/components/task-card";
-import { planMyDay, carryOverUnfinished } from "@/lib/task-store";
-import { Loader2, Sun, Sparkles, Trophy, RotateCcw, Clock } from "lucide-react";
+import { planMyDay, carryOverUnfinished, autoCompleteOverdue } from "@/lib/task-store";
+import { Loader2, Sun, Sparkles, Trophy, Clock } from "lucide-react";
 import { toast } from "sonner";
 import type { Task } from "@/lib/types";
 
@@ -12,6 +12,11 @@ export default function TodayPage() {
   const { tasks, loading, updateTask, fetchTasks } = useTasks("today");
   const { tasks: backlogTasks, updateTask: updateBacklog, fetchTasks: fetchBacklog } = useTasks("backlog");
   const [planning, setPlanning] = useState(false);
+
+  useEffect(() => {
+    const completed = autoCompleteOverdue();
+    if (completed > 0) fetchTasks();
+  }, []);
 
   const activeTasks = tasks.filter((t) => t.status !== "done");
   const doneTasks = tasks.filter((t) => t.status === "done");
