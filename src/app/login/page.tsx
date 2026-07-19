@@ -2,14 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Sparkles, Loader2, Eye, EyeOff } from "lucide-react";
-import { loginWithCredentials, isAuthenticated } from "@/lib/auth";
+import { Sparkles, Loader2 } from "lucide-react";
+import { login, validateLogin, isAuthenticated } from "@/lib/auth";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
+  const [identifier, setIdentifier] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -22,15 +20,16 @@ export default function LoginPage() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    setLoading(true);
 
-    const user = loginWithCredentials(username.trim(), password);
-    if (user) {
-      router.replace("/");
-    } else {
-      setError("Invalid username or password");
-      setLoading(false);
+    const validationError = validateLogin(identifier);
+    if (validationError) {
+      setError(validationError);
+      return;
     }
+
+    setLoading(true);
+    login(identifier.trim());
+    router.replace("/");
   }
 
   return (
@@ -46,43 +45,19 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <label htmlFor="username" className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Username
+            <label htmlFor="identifier" className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              Email or Username
             </label>
             <input
-              id="username"
+              id="identifier"
               type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Enter username"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              placeholder="you@example.com or username"
               autoComplete="username"
               autoFocus
               className="w-full rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all"
             />
-          </div>
-
-          <div className="space-y-2">
-            <label htmlFor="password" className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Password
-            </label>
-            <div className="relative">
-              <input
-                id="password"
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter password"
-                autoComplete="current-password"
-                className="w-full rounded-xl border border-border bg-card px-4 py-3 pr-11 text-sm font-medium placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-              >
-                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            </div>
           </div>
 
           {error && (
@@ -91,7 +66,7 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            disabled={loading || !username.trim() || !password}
+            disabled={loading || !identifier.trim()}
             className="w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground shadow-sm hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50"
           >
             {loading ? <Loader2 className="h-4 w-4 animate-spin mx-auto" /> : "Sign in"}
@@ -99,7 +74,7 @@ export default function LoginPage() {
         </form>
 
         <p className="text-center text-[11px] text-muted-foreground/50">
-          Demo: admin / admin123
+          No sign-up needed. Enter any email or username.
         </p>
       </div>
     </div>
