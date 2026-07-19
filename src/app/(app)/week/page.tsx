@@ -108,22 +108,20 @@ export default function WeekPage() {
             const dateStr = toDateStr(day);
             const isToday = dateStr === todayStr;
             return (
-              <div key={dateStr} className="text-center pb-2">
+              <div key={dateStr} className="flex flex-col items-center justify-center pb-2">
                 <p className={`text-[10px] font-bold uppercase tracking-wider ${isToday ? "text-primary" : "text-muted-foreground"}`}>
                   <span className="hidden sm:inline">{dayNamesFull[i].slice(0, 3)}</span>
                   <span className="sm:hidden">{dayNamesShort[i].charAt(0)}</span>
                 </p>
-                <p className={`text-lg font-semibold leading-tight ${
-                  isToday ? "text-primary" : ""
-                }`}>
-                  {isToday ? (
-                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm">
-                      {day.getDate()}
-                    </span>
-                  ) : (
-                    day.getDate()
-                  )}
-                </p>
+                <div className="flex items-center justify-center h-9 w-9 mt-0.5">
+                  <span className={`flex items-center justify-center h-9 w-9 rounded-full text-lg font-semibold ${
+                    isToday
+                      ? "bg-primary text-primary-foreground text-sm"
+                      : ""
+                  }`}>
+                    {day.getDate()}
+                  </span>
+                </div>
               </div>
             );
           })}

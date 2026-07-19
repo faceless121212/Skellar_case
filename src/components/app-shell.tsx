@@ -1,11 +1,14 @@
 "use client";
 
+import { useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { Toaster } from "@/components/ui/sonner";
 import { Inbox, Sun, PenLine, Sparkles, CalendarDays, CheckCircle2, LogOut } from "lucide-react";
 import { logout, getUser } from "@/lib/auth";
+import { AIAssistant } from "@/components/ai-assistant";
+import { getTasks } from "@/lib/task-store";
 
 const navItems = [
   { href: "/", label: "Capture", icon: PenLine },
@@ -20,13 +23,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const user = getUser();
 
+  const currentPage = pathname === "/" ? "capture" : pathname.replace("/", "").split("/")[0];
+  const showAssistant = currentPage !== "capture" && currentPage !== "task";
+  const tasks = useMemo(() => {
+    if (!showAssistant) return [];
+    if (currentPage === "today") return getTasks("today");
+    if (currentPage === "inbox") return getTasks("pending");
+    if (currentPage === "done") return getTasks("done");
+    return getTasks();
+  }, [currentPage, showAssistant]);
+
   function handleLogout() {
     logout();
     router.replace("/login");
   }
 
   return (
-    <div className="flex min-h-screen flex-col pb-16 sm:pb-0">
+    <div className="flex min-h-[100dvh] flex-col pb-[72px] sm:pb-0">
       {/* Desktop header */}
       <header className="hidden sm:block border-b bg-background/80 backdrop-blur-xl sticky top-0 z-50">
         <div className="mx-auto flex h-16 max-w-3xl items-center justify-between px-6">
@@ -83,8 +96,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </main>
 
       {/* Mobile bottom nav */}
-      <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-50 border-t bg-background/80 backdrop-blur-xl safe-bottom">
-        <div className="flex items-center justify-around px-2 py-2">
+      <nav
+        className="sm:hidden fixed bottom-0 left-0 right-0 z-50 border-t bg-background/95 backdrop-blur-xl"
+        style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+      >
+        <div className="flex items-center justify-around px-1 py-1.5">
           {navItems.map(({ href, label, icon: Icon }) => {
             const isActive =
               href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -93,20 +109,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 key={href}
                 href={href}
                 className={`
-                  flex flex-col items-center gap-0.5 rounded-xl px-3 py-2 transition-all duration-200
+                  flex flex-col items-center gap-0.5 rounded-xl px-2 py-1.5 min-w-0 transition-all duration-200
                   ${isActive
                     ? "text-primary"
-                    : "text-muted-foreground"
+                    : "text-muted-foreground active:text-foreground"
                   }
                 `}
               >
                 <Icon className={`h-5 w-5 ${isActive ? "stroke-[2.5]" : ""}`} />
-                <span className="text-[10px] font-medium">{label}</span>
+                <span className="text-[10px] font-medium truncate">{label}</span>
               </Link>
             );
           })}
         </div>
       </nav>
+
+      {showAssistant && <AIAssistant page={currentPage} tasks={tasks} />}
 
       <Toaster
         position="top-center"
