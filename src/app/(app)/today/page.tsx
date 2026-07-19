@@ -3,7 +3,8 @@
 import { useState, useMemo, useEffect } from "react";
 import { useTasks } from "@/lib/use-tasks";
 import { TaskCard } from "@/components/task-card";
-import { planMyDay, carryOverUnfinished, autoCompleteOverdue } from "@/lib/task-store";
+import { planMyDay, carryOverUnfinished, autoCompleteOverdue, updateTask as storeUpdateTask } from "@/lib/task-store";
+import { getSelectedModel } from "@/lib/settings";
 import { Loader2, Sun, Sparkles, Trophy, Clock } from "lucide-react";
 import { toast } from "sonner";
 import type { Task } from "@/lib/types";
@@ -28,8 +29,9 @@ export default function TodayPage() {
     return activeTasks.reduce((sum, t) => sum + (t.estimated_minutes ?? 0), 0);
   }, [activeTasks]);
 
-  function handlePlanMyDay() {
+  async function handlePlanMyDay() {
     setPlanning(true);
+
     const carried = carryOverUnfinished();
     if (carried > 0) {
       toast.info(`${carried} overdue task${carried !== 1 ? "s" : ""} carried over to today`);
@@ -39,11 +41,57 @@ export default function TodayPage() {
       toast.success(`${moved} task${moved !== 1 ? "s" : ""} moved to Today`);
       fetchTasks();
       fetchBacklog();
-    } else if (carried === 0) {
+    } else if (carried === 0 && tasks.length === 0) {
       toast.info("No tasks to plan. Confirm some in Inbox first!");
+      setPlanning(false);
+      return;
     } else {
       fetchTasks();
     }
+
+    const currentTasks = [...tasks, ...(moved > 0 ? [] : [])].filter((t) => t.status !== "done");
+    fetchTasks();
+
+    await new Promise((r) => setTimeout(r, 100));
+    const freshTasks = activeTasks.length > 0 ? activeTasks : currentTasks;
+
+    if (freshTasks.length > 0) {
+      try {
+        const res = await fetch("/api/plan-day", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            tasks: freshTasks.map((t) => ({
+              id: t.id,
+              title: t.title,
+              priority: t.priority,
+              due_date: t.due_date,
+              scheduled_time: t.scheduled_time,
+              estimated_minutes: t.estimated_minutes,
+              tags: t.tags,
+              status: t.status,
+            })),
+            model: getSelectedModel(),
+          }),
+        });
+
+        const data = await res.json();
+        if (data.planned && Array.isArray(data.planned)) {
+          for (const p of data.planned) {
+            storeUpdateTask(p.id, {
+              priority: p.priority,
+              scheduled_time: p.scheduled_time,
+              estimated_minutes: p.estimated_minutes,
+            });
+          }
+          toast.success("AI prioritized and scheduled your tasks");
+          fetchTasks();
+        }
+      } catch {
+        toast.info("Tasks moved but AI scheduling unavailable");
+      }
+    }
+
     setPlanning(false);
   }
 
